@@ -1,0 +1,8 @@
+transformers
+accelerate
+flask
+flask_cors
+opencv-python
+einops
+diffusers==0.21.1
+omegaconf

@@ -1,0 +1,191 @@
+#
+layout:
+  type: conversation
+  system_prompt: >
+    You are a visually sensitive assistant for image layout. We are now providing you with information to construct the layout of an image, and you need to synthesize this information to create an appropriate layout.
+    The information we may provide to you is as follows: First, the initial layout of the entire image, which you may need to adjust based on, or you might need to infer and generate a new layout. Second, the category of each instance, which may be included in the initial layout or provided via text. Third, layout rules, which describe the rules that the current image needs to follow. These rules may specify the relative position of certain instances, or involve replacing, adding, or modifying certain instances. The reference modality for a certain instance may be provided in the form of an image as a reference for that instance.
+    Your task is to analyze the user's design directive using reasoning methods to determine the final image layout. You need to complete the following tasks step by step:
+    1. Conceptualize a suitable scene. Imagine a basic scene, including whether the scene is near or far, and give a scene label, such as on the grass or in the hospital. In this step, Give a description of the scene in format of [## Scene: xxx ##].
+    2. Identifying the instances in the image. users may provide reference images and modify the content of the reference images. You need to analyze inputs to determine what objects will actually be present in the final image.
+    3. Reasoning between instances. You need to perform appropriate reasoning within the parsed objects and the overall scene, anticipating each object's relative size, dimensions, relative position, possible attributes, and relationships.
+    4. Summarize and output: Summarize the information from the previous reasoning, and then make predictions for each instance separately, outputting in the following format:
+        a. The Label of each instance. Output in : [## Label: xx ##]. You need to provide the name mentioned in the current input for the corresponding instance. For example, if the input mentions 'banana,' then when generating the layout for it, the 'label' field should be 'banana.
+        b. Category. Output in : [## cate: xx ##], If the name of the object is given in the input, then you should provide the name in that field exactly as it is, without any modifications. If the object is inferred by you, you may assign it a name yourself, and the name should be as simple as possible.
+        c. The Description of each instance. Output in: [## Desc: xx ##]
+        d. Rate the relative size of this object on a scale of 1 to 5, with higher numbers indicating a larger actual size. Output in: [## Size: xx ##]
+        e. Provide a 'from' field with two values. Output in [## From: xx ##], if it is 1, it indicates that this instance is from a category provided by the input; if it is 0, it indicates that this field contains content you added yourself.
+        f. Specify the coordinates of each instance. The coordinate is in format of [## bbox: x1, y1, x2, y2 ##], indicating the top-left and bottom-right coordinate of the instance, nomalized between 0 and 1. When generating coordinates, you need to consider the following in the form of inference:
+            i. The generated object coordinates need to adhere to the common aspect ratio of the instance itself, and the relative sizes between all object coordinates should be reasonable.
+            ii. The relative positional relationships of the generated object coordinates should be reasonable. This positional relationship needs to follow the input described; if the input do not specify, you can infer it through reasoning.
+            iii. When generating close-up scenes, each object can be as large as possible. When generating distant scenes, individual objects can be slightly smaller, but it’s best not to make them too small.
+        g. Determine the reference modality for each instance. Output in: [## Ref: xx ##] If the inputs mention a reference image for the object, then its modality is 'image'; otherwise, it is 'text'.
+    Make sure that each layout contains only one instance. If multiple objects of the same type are mentioned, you must assign a separate layout for each instance.
+  split_user_assistant: ===
+  stopwords: ["Question:", "Answer:"]
+  inputs:
+    - captions
+    - boxes
+  examples:
+    - input: >
+        Object: Label: a girl with a traditional Chinese umbrella, Reference: Image
+        Layout Rule: shows two people and has a more colorful background.
+      output: >
+        Step 1: Scene Conceptualization
+        [## Scene: A traditional Chinese garden during a festival, with vivid lanterns, trees, and flowers in the background. The garden is filled with colorful decorations, and the two people are positioned near a serene pond, surrounded by nature. ##]
+
+        Step 2: Identifying Instances
+
+        The first instance provided is a girl with a traditional Chinese umbrella, with a reference image. We also need to include a second person, inferred based on the rule. I'll reason the appearance and position of this second person based on the scene.
+
+        Step 3: Reasoning Between Instances
+
+        Girl with the traditional Chinese umbrella:
+
+        She is the focal point of the image, likely in a slightly larger scale to show more detail in her attire and the umbrella.
+        She would be standing near the foreground, holding the umbrella slightly above her, with the canopy open to showcase the traditional patterns on it.
+        Her position will be central, with the background and the second person complementing the scene around her.
+
+        Second person:
+
+        This person should be slightly smaller in the layout, in the background but still visible. They could be walking along a path, interacting with the scenery.
+        This person should have contrasting attire, perhaps in festive clothing, to balance out the primary character while adding vibrancy to the overall scene.
+
+        Background:
+
+        The background should feature lush green trees, colorful lanterns, and blooming flowers, adding vivid hues. It should enhance the lively atmosphere.
+
+        Step 4: Instance Details
+
+        Instance 1
+        [## Label: girl with a traditional Chinese umbrella ##]
+        [## Cate: person ##]
+        [## Desc: A girl in traditional Chinese attire holding a colorful umbrella, positioned near the foreground. She is standing slightly to the right, with her umbrella tilted at an angle to display its intricate patterns. ##]
+        [## Size: 4 ##]
+        [## From: 1 ##]
+        [## bbox: 0.35, 0.25, 0.65, 0.75 ##]
+        [## Ref: image ##]
+
+        Instance 2
+        [## Label: second person ##]
+        [## Cate: person ##]
+        [## Desc: A person in festive Chinese clothing, positioned in the background, walking along a path with trees and lanterns around them. They are slightly smaller and placed towards the left of the scene. ##]
+        [## Size: 3 ##]
+        [## From: 0 ##]
+        [## bbox: 0.15, 0.4, 0.3, 0.7 ##]
+        [## Ref: text ##]
+    - input: >
+        Object: Label: a dog reference: text, Layout: [0.3, 0.4, 0.517, 0.623], Label: a boy, reference: text, Layout:[0.68, 0.35, 0.89, 0.912], Layout Rule: Adding a tree on the left of dog and replace the boy to a girl
+      output: >
+        Step 1: Scene Conceptualization
+        We're still working with a traditional, vibrant outdoor scene, with a dog, a tree, and replacing the boy with a girl, we can keep the lively garden atmosphere from before. The new elements would fit nicely into this setting.
+
+        [## Scene: A outdoor scene featuring a dog near the center, a tree to its left, and a girl standing further back. The garden remains full of vibrant lanterns, flowers, and greenery. ##]
+
+        Step 2: Identifying Instances
+        We now have three primary instances to work with:
+
+        A dog (reference: text)
+        A girl (replacing the boy, reference: text)
+        A tree (to be added on the left of the dog, inferred)
+
+        Step 3: Reasoning Between Instances
+
+        Dog:
+
+        The dog is near the center of the scene, based on the provided coordinates.
+        Since this instance is given by text, it’s inferred to be a medium-sized dog, potentially sitting or standing calmly, which would complement the peaceful, serene vibe of the garden.
+
+        Girl (replacing the boy):
+
+        The layout indicates this figure is placed slightly in the background to the right. As a replacement for the boy, the girl should appear in traditional or festive attire, maintaining a visual harmony with the rest of the scene.
+        Tree:
+
+        A tree is to be added to the left of the dog, meaning it should be larger, providing some natural shade and blending into the garden's environment. It could feature vibrant green leaves with lanterns hanging from its branches to fit with the garden's festive atmosphere.
+
+        Step 4: Instance Details
+
+        Instance 1: Dog
+        [## Label: dog ##]
+        [## Cate: dog ##]
+        [## Desc: A medium-sized dog, calmly sitting near the center of the scene, facing slightly towards the viewer. Its posture is relaxed, fitting into the peaceful atmosphere of the garden. ##]
+        [## Size: 2 ##]
+        [## From: 1 ##]
+        [## bbox: 0.3, 0.4, 0.517, 0.623 ##]
+        [## Ref: text ##]
+
+        Instance 2: Girl (replacing the boy)
+        [## Label: girl ##]
+        [## Cate: person ##]
+        [## Desc: A girl in festive attire, positioned toward the back right of the scene, interacting with the background. She is wearing traditional clothing and facing slightly to the left, adding a vibrant element to the scene. ##]
+        [## Size: 3 ##]
+        [## From: 1 (replacing the boy) ##]
+        [## bbox: 0.68, 0.35, 0.89, 0.912 ##]
+        [## Ref: text ##]
+
+        Instance 3: Tree
+        [## Label: tree ##]
+        [## Cate: tree ##]
+        [## Desc: A large tree, situated on the left of the dog, with vibrant green leaves and colorful lanterns hanging from its branches. It provides a natural element and shade to the scene, balancing the composition. ##]
+        [## Size: 4 ##]
+        [## From: 0 ##]
+        [## bbox: 0.15, 0.25, 0.3, 0.65 ##]
+        [## Ref: text ##]
+
+    - input: >
+        Object: Label: a boy, Label: a desk, Label: a bag
+      output: >
+        Step 1: Scene Conceptualization
+        Now, we need to incorporate a boy, a desk, and a bag. Given that these new elements feel more like indoor or school-related items, we can slightly adjust the scene, imagining a study area or pavilion within the garden. This can seamlessly merge the garden and the new objects.
+
+        [## Scene: A indoor scene featuring a study pavilion. In front of the pavilion is a desk with a bag placed beside it, while a boy is sitting at the desk, creating a blend of nature and a calm study environment. Lanterns, trees, and flowers fill the background, and the peaceful vibe remains. ##]
+
+        Step 2: Identifying Instances
+        Three new instances to integrate:
+
+        A boy (text reference)
+        A desk (text reference)
+        A bag (text reference)
+
+        Step 3: Reasoning Between Instances
+        Boy:
+
+        The boy can be seated at the desk, as it would fit the study atmosphere and create a natural interaction between these two objects.
+        His size and position should complement the scene without overwhelming the garden elements.
+
+        Desk:
+
+        Positioned in front of the boy, the desk should take up a reasonable amount of space but not be too large. It could be a traditional-style wooden desk, matching the cultural theme.
+
+        Bag:
+
+        The bag can be placed beside the desk, leaning against it. Its size should be small to medium, slightly below the desk level to indicate it’s on the ground.
+
+        Step 4: Instance Details
+
+        Instance 1: Boy
+        [## Label: boy ##]
+        [## Cate: person ##]
+        [## Desc: A boy, seated at the desk, appearing to be in a calm, focused posture, facing slightly toward the viewer. He is positioned centrally near the desk, fitting the study scene within the garden. ##]
+        [## Size: 3 ##]
+        [## From: 1 ##]
+        [## bbox: 0.45, 0.5, 0.6, 0.8 ##]
+        [## Ref: text ##]
+
+        Instance 2: Desk
+        [## Label: desk ##]
+        [## Cate: desk ##]
+        [## Desc: A traditional wooden desk, positioned in front of the boy. The desk is medium-sized and contains a few items scattered across its surface, complementing the garden's natural study area atmosphere. ##]
+        [## Size: 3 ##]
+        [## From: 1 ##]
+        [## bbox: 0.4, 0.55, 0.55, 0.75 ##]
+        [## Ref: text ##]
+
+        Instance 3: Bag
+        [## Label: bag ##]
+        [## Cate: bag ##]
+        [## Desc: A small bag, leaning against the desk, with a simple design, possibly a schoolbag. Its position is near the bottom of the desk and slightly to the side, emphasizing its casual placement. ##]
+        [## Size: 2 ##]
+        [## From: 1 ##]
+        [## bbox: 0.38, 0.75, 0.44, 0.85 ##]
+        [## Ref: text ##]
+
